@@ -17,6 +17,7 @@ from config.settings import config
 from services.data_loader import DataLoader
 from models.grid_strategy import GridStrategy
 from services.backtester import Backtester
+from src.backtester_v2 import AdaptiveBacktester
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -107,7 +108,7 @@ def run_backtest(
     initial_balance: float,
 ) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
     """
-    Запускает бэктест и возвращает результаты.
+    Запускает бэктест и возвращает результаты (v1.0 ручной режим).
 
     Args:
         data: Исторические данные.
@@ -140,11 +141,93 @@ def run_backtest(
         trades_df = backtester.get_trades_dataframe()
         equity_df = backtester.get_equity_dataframe()
 
-        logger.info(f"Бэктест завершён. Сделок: {len(trades_df)}")
+        logger.info(f"Бэктест v1.0 завершён. Сделок: {len(trades_df)}")
         return trades_df, metrics, equity_df
     except Exception as e:
         st.error(f"Ошибка выполнения бэктеста: {e}")
         logger.exception("Ошибка бэктеста")
+        return pd.DataFrame(), {}, pd.DataFrame()
+
+
+def run_backtest_v2(
+    data: pd.DataFrame,
+    use_auto_config: bool,
+    initial_balance: float,
+    upper_bound: float = None,
+    lower_bound: float = None,
+    grid_levels: int = None,
+    order_size: float = None,
+) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
+    """
+    Запускает бэктест v2.0 с поддержкой автонастройки.
+
+    Args:
+        data: Исторические данные.
+        use_auto_config: Использовать автонастройку.
+        initial_balance: Начальный баланс.
+        upper_bound: Верхняя граница (используется только при ручном режиме).
+        lower_bound: Нижняя граница (используется только при ручном режиме).
+        grid_levels: Количество уровней (используется только при ручном режиме).
+        order_size: Размер ордера (используется только при ручном режиме).
+
+    Returns:
+        Кортеж (trades_df, metrics, equity_df).
+    """
+    try:
+        if use_auto_config:
+            # Используем AdaptiveBacktester с автонастройкой
+            logger.info("Запуск бэктеста v2.0 с автонастройкой")
+            backtester = AdaptiveBacktester(
+                initial_balance=initial_balance,
+                use_auto_config=True
+            )
+            
+            # Для автонастройки нужны дневные данные, но у нас только торговые данные
+            # Используем те же данные для упрощения
+            daily_data = data.resample('D').agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).dropna() if len(data) > 100 else data
+            
+            # Запуск с автонастройкой
+            metrics = backtester.run_with_auto_config(
+                daily_data=daily_data,
+                intraday_data=data,
+                fee_rate=0.0006
+            )
+        else:
+            # Ручной режим v1.0
+            logger.info("Запуск бэктеста v2.0 в ручном режиме")
+            backtester = AdaptiveBacktester(
+                initial_balance=initial_balance,
+                use_auto_config=False
+            )
+            
+            # Создаем стратегию с ручными параметрами
+            from src.grid_strategy_v2 import AdaptiveGridStrategy
+            strategy = AdaptiveGridStrategy(
+                upper_bound=upper_bound,
+                lower_bound=lower_bound,
+                num_levels=grid_levels,
+                amount_per_level=order_size,
+                deposit=initial_balance
+            )
+            
+            # Запуск стандартного бэктеста
+            metrics = backtester.run_backtest(data, strategy)
+
+        # Получение результатов
+        trades_df = backtester.get_trades_dataframe()
+        equity_df = backtester.get_equity_dataframe()
+
+        logger.info(f"Бэктест v2.0 завершён. Сделок: {len(trades_df)}")
+        return trades_df, metrics, equity_df
+    except Exception as e:
+        st.error(f"Ошибка выполнения бэктеста v2.0: {e}")
+        logger.exception("Ошибка бэктеста v2.0")
         return pd.DataFrame(), {}, pd.DataFrame()
 
 
@@ -184,6 +267,36 @@ def display_results(trades_df: pd.DataFrame, metrics: dict, equity_df: pd.DataFr
 
         st.metric("Начальный баланс", f"{metrics.get('initial_balance', 0):.2f} USDT")
         st.metric("Финальный капитал", f"{metrics.get('final_equity', 0):.2f} USDT")
+        
+        # Отображение режима рынка и автонастроенных параметров (v2.0)
+        if 'configuration' in metrics and metrics['configuration']:
+            config_data = metrics['configuration']
+            mode = config_data.get('mode', 'UNKNOWN')
+            mode_emoji = {"UPTREND": "📈", "DOWNTREND": "📉", "RANGE": "↔️"}
+            emoji = mode_emoji.get(mode, "❓")
+            
+            st.subheader("🤖 Автонастроенные параметры")
+            st.metric("Режим рынка", f"{emoji} {mode}")
+            
+            # Таблица параметров
+            params_df = pd.DataFrame({
+                'Параметр': ['Режим', 'Границы', 'Уровни', 'Шаг', 'Размер', 'Волатильность'],
+                'Значение': [
+                    mode,
+                    f"{config_data.get('lower_bound', 0):.0f} - {config_data.get('upper_bound', 0):.0f}",
+                    config_data.get('num_levels', 0),
+                    f"{config_data.get('grid_step', 0):.2f}",
+                    f"{config_data.get('amount_per_level', 0):.4f} BTC",
+                    f"{config_data.get('volatility', 0):.2%}" if config_data.get('volatility') else "N/A"
+                ]
+            })
+            st.table(params_df)
+            
+            # Дополнительная информация
+            if config_data.get('auto_configured'):
+                st.info("✅ Параметры настроены автоматически на основе анализа рынка")
+            else:
+                st.warning("⚠️ Используются ручные параметры")
     else:
         st.warning("Метрики недоступны.")
 
@@ -306,36 +419,59 @@ def main():
         help="Количество дней исторических данных для загрузки.",
     )
 
-    # Параметры сетки
+    # Grid Bot v2.0
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🤖 Grid Bot v2.0")
+
+    use_auto_config = st.sidebar.checkbox(
+        "Использовать автонастройку",
+        value=True,
+        help="Автоматически рассчитать все параметры"
+    )
+
+    if use_auto_config:
+        st.sidebar.info("✅ Автонастройка включена")
+    else:
+        st.sidebar.warning("⚠️ Ручной режим v1.0")
+
+    # Параметры сетки (показываются только при выключенной автонастройке)
     st.sidebar.subheader("Параметры сетки")
-    lower_bound = st.sidebar.number_input(
-        "Нижняя граница (USDT)",
-        min_value=0.0,
-        value=50000.0,
-        step=1000.0,
-        help="Нижняя цена сетки.",
-    )
-    upper_bound = st.sidebar.number_input(
-        "Верхняя граница (USDT)",
-        min_value=0.0,
-        value=60000.0,
-        step=1000.0,
-        help="Верхняя цена сетки.",
-    )
-    grid_levels = st.sidebar.slider(
-        "Количество уровней",
-        min_value=5,
-        max_value=100,
-        value=config.grid_levels,
-    )
-    order_size = st.sidebar.number_input(
-        "Размер ордера (BTC)",
-        min_value=0.001,
-        value=config.order_size,
-        step=0.001,
-        format="%.3f",
-        help="Объём на каждый уровень в BTC.",
-    )
+    
+    if not use_auto_config:
+        lower_bound = st.sidebar.number_input(
+            "Нижняя граница (USDT)",
+            min_value=0.0,
+            value=50000.0,
+            step=1000.0,
+            help="Нижняя цена сетки.",
+        )
+        upper_bound = st.sidebar.number_input(
+            "Верхняя граница (USDT)",
+            min_value=0.0,
+            value=60000.0,
+            step=1000.0,
+            help="Верхняя цена сетки.",
+        )
+        grid_levels = st.sidebar.slider(
+            "Количество уровней",
+            min_value=5,
+            max_value=100,
+            value=config.grid_levels,
+        )
+        order_size = st.sidebar.number_input(
+            "Размер ордера (BTC)",
+            min_value=0.001,
+            value=config.order_size,
+            step=0.001,
+            format="%.3f",
+            help="Объём на каждый уровень в BTC.",
+        )
+    else:
+        # При автонастройке используем значения по умолчанию (будут переопределены)
+        lower_bound = 50000.0
+        upper_bound = 60000.0
+        grid_levels = config.grid_levels
+        order_size = config.order_size
 
     # Начальный баланс
     initial_balance = st.sidebar.number_input(
@@ -415,14 +551,26 @@ def main():
                     st.error("Нет данных для бэктеста.")
                     return
 
-                trades_df, metrics, equity_df = run_backtest(
-                    data=data,
-                    upper_bound=upper_bound,
-                    lower_bound=lower_bound,
-                    grid_levels=grid_levels,
-                    order_size=order_size,
-                    initial_balance=initial_balance,
-                )
+                # Выбор версии бэктеста в зависимости от режима
+                if use_auto_config:
+                    # v2.0 с автонастройкой
+                    trades_df, metrics, equity_df = run_backtest_v2(
+                        data=data,
+                        use_auto_config=True,
+                        initial_balance=initial_balance,
+                        # Параметры для ручного режима не нужны
+                    )
+                else:
+                    # v1.0 ручной режим
+                    trades_df, metrics, equity_df = run_backtest_v2(
+                        data=data,
+                        use_auto_config=False,
+                        initial_balance=initial_balance,
+                        upper_bound=upper_bound,
+                        lower_bound=lower_bound,
+                        grid_levels=grid_levels,
+                        order_size=order_size,
+                    )
 
                 # Сохранение в session_state
                 st.session_state.trades_df = trades_df
