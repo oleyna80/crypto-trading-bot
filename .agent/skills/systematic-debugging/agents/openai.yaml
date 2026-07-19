@@ -1,0 +1,4 @@
+interface:
+  display_name: "Systematic Debugging"
+  short_description: "Diagnose a reproducible Python defect with evidence."
+  default_prompt: "Find the root cause and report a bounded fix plan; write only in an approved Coder stage."

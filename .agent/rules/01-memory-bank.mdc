@@ -1,0 +1,16 @@
+# Memory Bank Rule
+
+At every new work block, read:
+
+- `memory_bank/context.md`
+- `memory_bank/progress.md`
+- `memory_bank/decisions.md`
+
+After successful Verification of a scoped task, update
+`memory_bank/progress.md` with completed work, checks and known follow-ups.
+Add an ADR-style entry to `memory_bank/decisions.md` only for an accepted
+decision affecting architecture, provider choice, strategy behavior or
+deployment assumptions. Do not mark unverified work as complete.
+
+When the Owner supplies durable project facts, record them only in the relevant
+project memory file and only within the approved documentation scope.

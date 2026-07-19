@@ -1,0 +1,4 @@
+interface:
+  display_name: "Independent Code Review"
+  short_description: "Review a bounded diff for regressions and scope."
+  default_prompt: "Review the listed files against the approved spec and report findings."

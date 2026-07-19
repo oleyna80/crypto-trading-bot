@@ -1,0 +1,15 @@
+# SDD Protocol Rule
+
+When a request triggers code generation, a new feature, API/provider
+integration, strategy change, migration or deployment-affecting change:
+
+1. Check the active ticket and its PRD/plan/tasklist.
+2. If required artifacts are missing, prepare or request a minimal spec before
+   implementation.
+3. Confirm acceptance criteria, write-set, out-of-scope items and tests.
+4. Implement only the approved scope with one active Coder.
+5. Hand the result to read-only Review, then independent Verification.
+6. Update tasklist and memory bank only after verification passes.
+
+For a small documentation-only change, state why the lightweight path is
+sufficient and still report changed files and checks.

@@ -1,0 +1,13 @@
+schema_version: 1
+source:
+  repository: /home/azur/Projects/WSL/agentic-sdlc-framework
+  revision: 49850ff6fa0816bbe7feee2d54af2d792444bb5a
+  license: MIT
+skills:
+  - architecture-discovery
+  - scoped-coder
+  - reviewer
+  - verifier
+  - systematic-debugging
+  - security-audit-triage
+  - ssot-sync-closeout

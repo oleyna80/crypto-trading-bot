@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Audit Triage"
+  short_description: "Assess code-security findings with current-tree evidence."
+  default_prompt: "Classify the supplied security findings against the approved source scope."

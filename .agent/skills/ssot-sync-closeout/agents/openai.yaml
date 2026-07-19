@@ -1,0 +1,4 @@
+interface:
+  display_name: "SSOT Sync Closeout"
+  short_description: "Synchronize verified task evidence and project memory."
+  default_prompt: "Close the verified task without rewriting history or overstating results."

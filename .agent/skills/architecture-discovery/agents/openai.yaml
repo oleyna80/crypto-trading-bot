@@ -1,0 +1,4 @@
+interface:
+  display_name: "DEX Architecture Discovery"
+  short_description: "Analyze bybit_grid_bot architecture before changes."
+  default_prompt: "Analyze the approved area and return evidence-backed options without edits."

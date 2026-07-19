@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scoped Python Coder"
+  short_description: "Implement a bounded bybit_grid_bot change."
+  default_prompt: "Implement the approved task within the listed files and report checks."

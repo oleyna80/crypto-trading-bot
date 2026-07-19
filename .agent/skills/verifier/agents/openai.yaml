@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Verification"
+  short_description: "Run evidence-based checks for a bounded change."
+  default_prompt: "Verify the approved change with targeted pytest and import smoke checks."

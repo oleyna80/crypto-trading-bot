@@ -1,0 +1,11 @@
+# Task Master Rule
+
+For every scoped task:
+
+- Keep a checklist in the ticket plan or tasklist.
+- Mark an item complete only after its AC has passed Verification.
+- Record blockers, skipped checks and follow-up work explicitly.
+- When a task is verified, update `memory_bank/progress.md` and link the next
+  task.
+
+Do not silently abandon unfinished tasks or represent unrun tests as passed.
